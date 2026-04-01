@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-// TODO: greet the user by name from config
 func main() {
-	fmt.Println("Hello, World!")
+	// Greeting using name "Serghei" and Ukrainian "Привіт" from issue comments
+	fmt.Println("Привіт, Serghei!")
 }
