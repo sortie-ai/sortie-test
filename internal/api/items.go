@@ -4,8 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+)
+
+// defaultItemsLimit and maxItemsLimit bound the limit query parameter on
+// GET /items.
+const (
+	defaultItemsLimit = 20
+	maxItemsLimit     = 100
 )
 
 // Item is a single task record.
@@ -55,7 +63,8 @@ func (s *Store) Put(it Item) {
 
 // listResponse wraps a collection so the payload stays an object.
 type listResponse struct {
-	Items []Item `json:"items"`
+	Items      []Item  `json:"items"`
+	NextCursor *string `json:"next_cursor"`
 }
 
 // Handler serves the item endpoints.
@@ -79,9 +88,48 @@ func NewRouter(store *Store) *http.ServeMux {
 	return mux
 }
 
-// ListItems responds with every stored item.
-func (h *Handler) ListItems(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, listResponse{Items: h.store.List()})
+// ListItems responds with a page of stored items ordered by ID.
+//
+// The limit query parameter caps the page size (default 20, maximum 100).
+// The cursor query parameter, when set, is the ID of the last item from the
+// previous page; items with a greater ID are returned.
+func (h *Handler) ListItems(w http.ResponseWriter, r *http.Request) {
+	limit := defaultItemsLimit
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > maxItemsLimit {
+			WriteError(w, http.StatusBadRequest, "invalid_limit", "limit must be a number between 1 and 100")
+
+			return
+		}
+		limit = parsed
+	}
+
+	items := h.store.List()
+
+	cursor := r.URL.Query().Get("cursor")
+	start := 0
+	if cursor != "" {
+		start = len(items)
+		for i, it := range items {
+			if it.ID > cursor {
+				start = i
+
+				break
+			}
+		}
+	}
+
+	page := items[start:]
+
+	var nextCursor *string
+	if len(page) > limit {
+		page = page[:limit]
+		lastID := page[len(page)-1].ID
+		nextCursor = &lastID
+	}
+
+	writeJSON(w, http.StatusOK, listResponse{Items: page, NextCursor: nextCursor})
 }
 
 // CreateItem stores a new item read from the request body.
