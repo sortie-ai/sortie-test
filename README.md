@@ -17,6 +17,7 @@ When changing `internal/api`, follow the patterns already in the package:
 - Error codes are `lower_snake_case` and name the cause, not the HTTP status.
 - Routes are registered in `NewRouter` with method patterns, for example `GET /items`.
 - Successful collection responses are wrapped in a named struct, never a bare slice or map.
+- Paginated collection endpoints accept `limit` (default 20, maximum 100) and `cursor` (the id to start after) query parameters, and return `next_cursor` alongside the collection: the id to pass as the next cursor, or `null` on the last page.
 - Handler tests are table-driven: a `tests` slice of anonymous structs and one `t.Run` per case.
  
 Run `go test ./...` before opening a pull request.
